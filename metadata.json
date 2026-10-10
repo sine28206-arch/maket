@@ -1,0 +1,6 @@
+{
+  "name": "한마음초 프리마켓 & 체험 프로그램 신청",
+  "description": "제주 한마음초등학교 학부모회 & 운영위원회가 함께하는 프리마켓 및 체험 프로그램 실시간 신청 웹앱",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
