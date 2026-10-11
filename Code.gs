@@ -1,21 +1,25 @@
 /**
  * ==============================================================================
- * 한마음초 프리마켓 & 체험 행사 구글 시트 연동 스크립트 (Code.gs)
+ * 한마음초 프리마켓 & 행운 뽑기권 구글 시트 연동 스크립트 (Code.gs)
  * 
  * - 구글 시트 ID: 1jYXplQcgpHoclNYNDUesJ4YNvNeyF2G4jNR3RXD6syw
  * - 시트 컬럼 규격:
  *   [A열] 학년/반
  *   [B열] 학생 이름
  *   [C열] 연락처
- *   [D열] 프리마켓 자리신청
- *   [E열] 체험 프로그램 (자녀별 프로그램 통합)
- *   [F열] 배정 순서 (신청 시간대)
- *   [G열] 행운권 번호 (자녀당 1개씩 순차 발행: 예: LKN-1004(홍은) / LKN-1005(홍윤))
+ *   [D열] 프리마켓 자리신청 (자동 배정: 예: 1번 자리, 2번 자리...)
+ *   [E열] 체험 프로그램 (-)
+ *   [F열] 배정 순서 (자리 번호: 예: 1번 자리)
+ *   [G열] 행운권 번호 (행운 뽑기권: 자녀당 1매씩 각각 순차 발행: 예: LKN-1001, LKN-1002)
+ * 
+ * * 규칙:
+ * 1. 가족당 프리마켓 1자리 원칙 (2자녀 이상 신청 시 동일한 자리 번호 부여)
+ * 2. 등록된 자녀 수만큼 구글 시트에 각 자녀당 1행씩(2자녀 등록 시 2줄) 자동 추가!
+ * 3. 각 자녀 행마다 해당 아이의 행운 뽑기권 번호와 프리마켓 자리가 자동 기록됩니다.
  * ==============================================================================
  */
 
 const SPREADSHEET_ID = "1jYXplQcgpHoclNYNDUesJ4YNvNeyF2G4jNR3RXD6syw";
-const MAX_CAPACITY_PER_SLOT = 8; // 타임별 최대 정원 8명
 
 /**
  * 대상 시트 가져오기 (첫 번째 시트 자동 선택)
@@ -43,102 +47,46 @@ function initHeaders(sheet) {
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
   headerRange.setFontWeight("bold")
              .setHorizontalAlignment("center")
-             .setVerticalAlignment("middle");
-  sheet.setRowHeight(1, 36);
+             .setVerticalAlignment("middle")
+             .setBackground("#E6FFFA");
+  sheet.setRowHeight(1, 38);
   sheet.setFrozenRows(1);
 }
 
 /**
- * [GET 요청] 실시간 잔여석 및 예약 현황 조회
+ * [GET 요청] 실시간 신청자 및 배정 현황 조회
  */
 function doGet(e) {
   try {
     const sheet = getTargetSheet();
     const data = sheet.getDataRange().getValues();
     
-    const counts = {
-      making: { slot1: 0, slot2: 0, slot3: 0, slot4: 0 },
-      game: { slot1: 0, slot2: 0, slot3: 0, slot4: 0 },
-      roulette: { slot1: 0, slot2: 0, slot3: 0, slot4: 0 }
-    };
-    
     const records = [];
-    let lastLuckyNumber = 1000;
     
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (!row[0] && !row[1]) continue;
       
-      const studentGradeClass = row[0] || "";  // A열
-      const studentName = row[1] || "";        // B열
-      const phone = row[2] || "";              // C열
-      const fleaMarket = row[3] || "미신청";     // D열
-      const programName = row[4] || "미신청";    // E열
-      const timeSlotLabel = row[5] || "";      // F열
-      const luckyTicket = row[6] || "미신청";    // G열
-      
-      // 행운권 번호 추적 (LKN-XXXX 형식 모두 탐색)
-      if (luckyTicket && String(luckyTicket) !== "미신청") {
-        const matches = String(luckyTicket).match(/LKN-(\d+)/g);
-        if (matches) {
-          for (let m = 0; m < matches.length; m++) {
-            const numPart = parseInt(matches[m].replace("LKN-", ""), 10);
-            if (!isNaN(numPart) && numPart > lastLuckyNumber) {
-              lastLuckyNumber = numPart;
-            }
-          }
-        }
-      }
-      
-      // 복수 프로그램 분리 집계 ('\n' 줄바꿈 및 ',' '/' 구분자 완벽 처리)
-      if (programName && programName !== "미신청" && programName !== "미참여") {
-        const lines = String(programName).split('\n');
-        for (let lIdx = 0; lIdx < lines.length; lIdx++) {
-          const line = lines[lIdx].trim();
-          if (!line) continue;
-          const progItems = line.split(/[,/]/);
-          for (let pIdx = 0; pIdx < progItems.length; pIdx++) {
-            const item = progItems[pIdx].trim();
-            if (!item) continue;
-            const pKey = mapProgramNameToKey(item);
-            let sKey = mapSlotLabelToKey(item);
-
-            // 이전 구버전 데이터(시간대가 F열에만 있던 경우) 호환
-            if (!sKey && timeSlotLabel) {
-              const slotParts = String(timeSlotLabel).split(/[\n/]/);
-              sKey = mapSlotLabelToKey(slotParts[pIdx] || slotParts[0] || '');
-            }
-
-            if (pKey && sKey && counts[pKey] && counts[pKey][sKey] !== undefined) {
-              counts[pKey][sKey]++;
-            }
-          }
-        }
-      }
-      
       records.push({
         id: "REC-" + i,
-        studentGradeClass: studentGradeClass,
-        studentName: studentName,
-        phone: String(phone),
-        fleaMarket: fleaMarket,
-        programName: programName,
-        timeSlotLabel: timeSlotLabel,
-        luckyTicket: luckyTicket
+        studentGradeClass: row[0] || "",
+        studentName: row[1] || "",
+        phone: row[2] || "",
+        fleaMarket: row[3] || "미신청",
+        seatNumber: row[3] || row[5] || "",
+        programName: row[4] || "-",
+        timeSlotLabel: row[5] || "",
+        luckyTicket: row[6] || "미신청",
+        noticeAgreed: "동의완료"
       });
     }
     
-    const responsePayload = {
+    return ContentService.createTextOutput(JSON.stringify({
       status: "success",
-      totalCount: records.length,
-      currentCounts: counts,
-      maxCapacity: MAX_CAPACITY_PER_SLOT,
-      lastLuckyNumber: lastLuckyNumber,
-      records: records
-    };
+      records: records,
+      totalCount: records.length
+    })).setMimeType(ContentService.MimeType.JSON);
     
-    return ContentService.createTextOutput(JSON.stringify(responsePayload))
-      .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({
       status: "error",
@@ -148,7 +96,10 @@ function doGet(e) {
 }
 
 /**
- * [POST 요청] 신규 신청 데이터 등록 (자녀당 행운권 1개씩 순차 발행)
+ * [POST 요청] 신규 프리마켓 자리 & 행운 뽑기권 자동 발급
+ * 
+ * - 가족당 1자리 자동 배정 (예: 1번 자리, 2번 자리...)
+ * - 2자녀 등록 시 구글 시트에 2줄로 각각 아이 이름당 행운 뽑기권과 프리마켓 자리 자동 기록
  */
 function doPost(e) {
   const lock = LockService.getScriptLock();
@@ -174,178 +125,127 @@ function doPost(e) {
     
     const sheet = getTargetSheet();
     const data = sheet.getDataRange().getValues();
-    const programName = postData.programName || "미신청";
-    const timeSlotLabel = postData.timeSlotLabel || "";
     
-    // [정원 검증 로직]
-    var requestedItems = [];
-    if (Array.isArray(postData.programsList) && postData.programsList.length > 0) {
-      for (var k = 0; k < postData.programsList.length; k++) {
-        var pi = postData.programsList[k];
-        if (pi.programId && pi.programId !== 'none' && pi.timeSlotId) {
-          requestedItems.push({
-            pKey: pi.programId,
-            sKey: pi.timeSlotId,
-            label: (mapProgramNameToKey(pi.programId) || pi.programId)
-          });
-        }
+    // 1. 기존 시트에서 최대 자리 번호(D열, F열) 탐색
+    let maxSeatNum = 0;
+    for (let i = 1; i < data.length; i++) {
+      const cellD = String(data[i][3] || "");
+      const cellF = String(data[i][5] || "");
+      const matchD = cellD.match(/(\d+)번/);
+      const matchF = cellF.match(/(\d+)번/);
+      if (matchD) {
+        const numD = parseInt(matchD[1], 10);
+        if (!isNaN(numD) && numD > maxSeatNum) maxSeatNum = numD;
       }
-    } else if (programName !== "미신청" && programName !== "미참여") {
-      var lines = String(programName).split('\n');
-      for (var lIdx = 0; lIdx < lines.length; lIdx++) {
-        var progItems = lines[lIdx].split(/[,/]/);
-        for (var pIdx = 0; pIdx < progItems.length; pIdx++) {
-          var item = progItems[pIdx].trim();
-          var pKey = mapProgramNameToKey(item);
-          var sKey = mapSlotLabelToKey(item);
-          if (!sKey && timeSlotLabel) {
-            var slotParts = String(timeSlotLabel).split(/[\n/]/);
-            sKey = mapSlotLabelToKey(slotParts[pIdx] || slotParts[0] || '');
-          }
-          if (pKey && sKey) {
-            requestedItems.push({ pKey: pKey, sKey: sKey, label: item });
+      if (matchF) {
+        const numF = parseInt(matchF[1], 10);
+        if (!isNaN(numF) && numF > maxSeatNum) maxSeatNum = numF;
+      }
+    }
+    
+    // 신규 배정 자리 번호 (가족당 1자리)
+    const isFleaRequested = postData.fleaMarket !== "미신청";
+    const assignedSeat = isFleaRequested ? (maxSeatNum + 1) + "번 자리" : "미신청";
+    
+    // 2. 기존 시트에서 최대 행운권 번호(G열) 탐색
+    let maxLuckyNum = 1000;
+    for (let i = 1; i < data.length; i++) {
+      const cellG = String(data[i][6] || "");
+      const matches = cellG.match(/LKN-(\d+)/g);
+      if (matches) {
+        for (let m = 0; m < matches.length; m++) {
+          const num = parseInt(matches[m].replace("LKN-", ""), 10);
+          if (!isNaN(num) && num > maxLuckyNum) {
+            maxLuckyNum = num;
           }
         }
       }
     }
-
-    if (requestedItems.length > 0) {
-      for (var rIdx = 0; rIdx < requestedItems.length; rIdx++) {
-        var reqPKey = requestedItems[rIdx].pKey;
-        var reqSKey = requestedItems[rIdx].sKey;
-        var currentBooked = 0;
-
-        for (var rowIdx = 1; rowIdx < data.length; rowIdx++) {
-          var exP = String(data[rowIdx][4] || '');
-          var exS = String(data[rowIdx][5] || '');
-          var exLines = exP.split('\n');
-
-          for (var elIdx = 0; elIdx < exLines.length; elIdx++) {
-            var exItems = exLines[elIdx].split(/[,/]/);
-            for (var epIdx = 0; epIdx < exItems.length; epIdx++) {
-              var exItem = exItems[epIdx].trim();
-              var curPKey = mapProgramNameToKey(exItem);
-              var curSKey = mapSlotLabelToKey(exItem);
-              if (!curSKey && exS) {
-                var exSlots = exS.split(/[\n/]/);
-                curSKey = mapSlotLabelToKey(exSlots[epIdx] || exSlots[0] || '');
-              }
-              if (curPKey === reqPKey && curSKey === reqSKey) {
-                currentBooked++;
-              }
-            }
-          }
-        }
-
-        if (currentBooked >= MAX_CAPACITY_PER_SLOT) {
-          lock.releaseLock();
-          return ContentService.createTextOutput(JSON.stringify({
-            status: "error",
-            message: "[" + requestedItems[rIdx].label + "] 은 이미 정원(8명)이 마감되었습니다."
-          })).setMimeType(ContentService.MimeType.JSON);
-        }
-      }
-    }
-
-    // [자녀당 행운권 1개씩 순차 자동 발행 로직]
-    let luckyTicket = "미신청";
-    let luckyTicketsList = [];
     
-    if (postData.luckyDraw === true || postData.luckyDraw === "true" || postData.luckyDraw === "참여") {
-      // 1. 기존 시트에서 최댓값 탐색
-      let maxNum = 1000;
-      for (let i = 1; i < data.length; i++) {
-        const cellVal = String(data[i][6] || ""); // G열
-        const matches = cellVal.match(/LKN-(\d+)/g);
-        if (matches) {
-          for (let m = 0; m < matches.length; m++) {
-            const num = parseInt(matches[m].replace("LKN-", ""), 10);
-            if (!isNaN(num) && num > maxNum) {
-              maxNum = num;
-            }
-          }
-        }
-      }
-      
-      // 2. 신청된 자녀 목록 가져오기
-      let childNames = [];
-      if (Array.isArray(postData.childrenList) && postData.childrenList.length > 0) {
-        childNames = postData.childrenList;
-      } else if (postData.studentName) {
-        childNames = String(postData.studentName).split('/').map(function(s) { return s.trim(); });
-      } else {
-        childNames = ["학생1"];
-      }
-      
-      // 3. 자녀당 1개씩 순차 발행 (예: LKN-1004(홍은), LKN-1005(홍윤))
-      const ticketStrings = [];
-      let currentNum = maxNum;
-      for (let cIdx = 0; cIdx < childNames.length; cIdx++) {
-        currentNum++;
-        const tNum = "LKN-" + currentNum;
-        const cName = childNames[cIdx];
-        ticketStrings.push(tNum + "(" + cName + ")");
-        luckyTicketsList.push({ childName: cName, ticketNumber: tNum });
-      }
-      
-      luckyTicket = ticketStrings.join(" / ");
+    // 3. 자녀 목록 추출 (객체 배열 또는 이름 배열 대응)
+    let childList = [];
+    if (Array.isArray(postData.children) && postData.children.length > 0) {
+      childList = postData.children.map(function(c) {
+        return {
+          gradeClass: (c.grade || "") + " " + (c.classNum || ""),
+          name: (c.name || "").trim()
+        };
+      });
+    } else if (Array.isArray(postData.childrenList) && postData.childrenList.length > 0) {
+      const gradeParts = String(postData.studentGradeClass || "").split('/');
+      childList = postData.childrenList.map(function(name, idx) {
+        return {
+          gradeClass: (gradeParts[idx] || gradeParts[0] || "").trim(),
+          name: String(name).trim()
+        };
+      });
+    } else {
+      const nameParts = String(postData.studentName || "학생").split('/');
+      const gradeParts = String(postData.studentGradeClass || "1학년 1반").split('/');
+      childList = nameParts.map(function(name, idx) {
+        return {
+          gradeClass: (gradeParts[idx] || gradeParts[0] || "").trim(),
+          name: String(name).trim()
+        };
+      });
     }
     
-    // 사용자 시트 7개 컬럼 매핑
-    const newRow = [
-      postData.studentGradeClass || "", // A열: 학년/반
-      postData.studentName || "",       // B열: 학생 이름
-      postData.phone || "",             // C열: 연락처
-      postData.fleaMarket || "미신청",    // D열: 프리마켓 자리신청
-      programName,                      // E열: 체험 프로그램
-      timeSlotLabel,                    // F열: 배정 순서
-      luckyTicket                       // G열: 행운권 번호
-    ];
+    // 4. 자녀별 1행씩 구글 시트에 추가
+    const luckyTicketsList = [];
+    let curLucky = maxLuckyNum;
     
-    // 시트에 1행 자동 추가
-    sheet.appendRow(newRow);
-    
-    const lastRowIndex = sheet.getLastRow();
-    const rowRange = sheet.getRange(lastRowIndex, 1, 1, newRow.length);
-    rowRange.setHorizontalAlignment("center")
-            .setVerticalAlignment("middle")
-            .setWrap(true);
-
-    const lineCount = Math.max(1, String(programName).split('\n').length);
-    sheet.setRowHeight(lastRowIndex, Math.max(34, lineCount * 22));
+    for (let cIdx = 0; cIdx < childList.length; cIdx++) {
+      curLucky++;
+      const childObj = childList[cIdx];
+      const ticketNum = "LKN-" + curLucky;
+      
+      luckyTicketsList.push({
+        childName: childObj.name,
+        ticketNumber: ticketNum,
+        seatNumber: assignedSeat
+      });
+      
+      // 시트에 추가될 1행:
+      // A열: 학년/반
+      // B열: 학생 이름
+      // C열: 연락처
+      // D열: 프리마켓 자리신청 (예: 1번 자리)
+      // E열: 체험 프로그램 (-)
+      // F열: 배정 순서 (예: 1번 자리)
+      // G열: 행운권 번호 (예: LKN-1001)
+      const childRow = [
+        childObj.gradeClass,              // A열
+        childObj.name,                    // B열
+        postData.phone || "",             // C열
+        assignedSeat,                     // D열 (프리마켓 자리 자동 부여)
+        "-",                              // E열 (체험프로그램 삭제)
+        assignedSeat,                     // F열 (배정 순서 / 자리)
+        ticketNum                         // G열 (해당 아이의 행운 뽑기권 번호)
+      ];
+      
+      sheet.appendRow(childRow);
+      
+      const lastRow = sheet.getLastRow();
+      const rRange = sheet.getRange(lastRow, 1, 1, childRow.length);
+      rRange.setHorizontalAlignment("center")
+            .setVerticalAlignment("middle");
+      sheet.setRowHeight(lastRow, 34);
+    }
     
     lock.releaseLock();
+    
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
-      message: "구글 시트에 성공적으로 자동 입력되었습니다!",
-      luckyTicket: luckyTicket,
-      luckyTicketsList: luckyTicketsList,
-      rowIndex: lastRowIndex
+      message: "구글 시트에 " + childList.length + "줄로 아이별 행운 뽑기권과 " + assignedSeat + "가 자동 부여되었습니다!",
+      seatNumber: assignedSeat,
+      luckyTicketsList: luckyTicketsList
     })).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
+    
+  } catch (err) {
     lock.releaseLock();
     return ContentService.createTextOutput(JSON.stringify({
       status: "error",
-      message: "시트 저장 오류: " + error.toString()
+      message: err.toString()
     })).setMimeType(ContentService.MimeType.JSON);
   }
-}
-
-function mapProgramNameToKey(name) {
-  if (!name) return null;
-  const str = String(name);
-  if (str.indexOf("만들기") !== -1) return "making";
-  if (str.indexOf("게임") !== -1) return "game";
-  if (str.indexOf("룰렛") !== -1) return "roulette";
-  return null;
-}
-
-function mapSlotLabelToKey(label) {
-  if (!label) return null;
-  const str = String(label);
-  if (str.indexOf("1타임") !== -1 || str.indexOf("10:00") !== -1) return "slot1";
-  if (str.indexOf("2타임") !== -1 || str.indexOf("11:00") !== -1) return "slot2";
-  if (str.indexOf("3타임") !== -1 || str.indexOf("13:00") !== -1) return "slot3";
-  if (str.indexOf("4타임") !== -1 || str.indexOf("14:00") !== -1) return "slot4";
-  return null;
 }

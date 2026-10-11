@@ -64,8 +64,8 @@ export const GasGuideModal: React.FC<Props> = ({ isOpen, onClose, onUrlUpdated }
         studentName: '홍길동(연동테스트)',
         phone: '010-0000-0000',
         fleaMarket: '신청',
-        programName: '만들기(홍길동)',
-        timeSlotLabel: '1타임: 10:00 ~ 11:00',
+        programName: '-',
+        timeSlotLabel: '1번 자리',
         luckyDraw: '참여',
         noticeAgreed: '동의완료'
       };

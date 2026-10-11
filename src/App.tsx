@@ -80,61 +80,30 @@ export default function App() {
     try {
       const result = await submitRegistration(formData);
       if (result.status === 'success') {
+        const studentGradeClass = formData.children.map(c => `${c.grade} ${c.classNum}`).join(' / ');
+        const studentName = formData.children.map(c => c.name.trim()).join(' / ');
+
         if (result.record) {
           setSuccessRecord({
             ...result.record,
+            studentGradeClass: result.record.studentGradeClass || studentGradeClass,
+            studentName: result.record.studentName || studentName,
+            seatNumber: result.seatNumber || result.record.seatNumber,
+            luckyTicket: result.luckyTicket || result.record.luckyTicket,
             luckyTicketsList: result.luckyTicketsList || result.record.luckyTicketsList
           });
         } else {
-          // record가 없으면 기본 생성
-          const studentGradeClass = formData.children.map(c => `${c.grade} ${c.classNum}`).join(' / ');
-          const studentName = formData.children.map(c => c.name).join(' / ');
-          const progDict: Record<string, string> = {
-            making: '만들기',
-            game: '게임',
-            roulette: '룰렛 돌리기'
-          };
-          const slotDict: Record<string, string> = {
-            slot1: '1타임: 10:00 ~ 11:00',
-            slot2: '2타임: 11:00 ~ 12:00',
-            slot3: '3타임: 13:00 ~ 14:00',
-            slot4: '4타임: 14:00 ~ 15:00'
-          };
-
-          let programName = '미신청';
-          let timeSlotLabel = '';
-
-          if (formData.programs.length > 0) {
-            const childProgLines: string[] = [];
-            const childSlotLines: string[] = [];
-
-            formData.children.forEach((c, cIdx) => {
-              const cName = c.name.trim() || `자녀 ${cIdx + 1}`;
-              const progsForChild = formData.programs.filter((p) => p.participantName.trim() === cName);
-              if (progsForChild.length > 0) {
-                const progParts = progsForChild.map((p) => `${progDict[p.programId]} (${slotDict[p.timeSlotId]})`);
-                const slotParts = progsForChild.map((p) => slotDict[p.timeSlotId]);
-                childProgLines.push(`${cName}: ${progParts.join(', ')}`);
-                childSlotLines.push(`${cName}: ${slotParts.join(', ')}`);
-              }
-            });
-
-            if (childProgLines.length > 0) {
-              programName = childProgLines.join('\n');
-              timeSlotLabel = childSlotLines.join('\n');
-            }
-          }
-
           setSuccessRecord({
-            id: 'REC-NEW',
+            id: `REC-${Date.now()}`,
             timestamp: new Date().toLocaleString('ko-KR'),
             studentGradeClass,
             studentName,
             phone: formData.phone,
-            fleaMarket: formData.fleaMarket,
-            programName,
-            timeSlotLabel,
-            luckyTicket: result.luckyTicket || '미신청',
+            fleaMarket: result.seatNumber || '1번 자리',
+            seatNumber: result.seatNumber || '1번 자리',
+            programName: '-',
+            timeSlotLabel: result.seatNumber || '1번 자리',
+            luckyTicket: result.luckyTicket || 'LKN-1001',
             luckyTicketsList: result.luckyTicketsList,
             noticeAgreed: '동의완료'
           });
@@ -324,13 +293,13 @@ export default function App() {
               />
               <span className="font-bold text-slate-900">
                 {records.length === 0
-                  ? '현재 신청 접수 대기 중 (모든 운영 시간대 8명 정원 여유)'
-                  : `현재 총 ${records.length}가족 신청 완료`}
+                  ? '현재 신청 접수 대기 중 (가족당 1자리 자동 배정 & 자녀별 행운 뽑기권 부여)'
+                  : `현재 총 ${records.length}명(행) 등록 완료`}
               </span>
               <span className="text-slate-400 hidden sm:inline">|</span>
               <span className="text-slate-600 hidden sm:inline">
                 {hasConfiguredGas
-                  ? '✅ 구글 시트 실시간 자동 기록 활성화됨'
+                  ? '✅ 구글 시트 실시간 자동 기록 활성화됨 (자녀당 1줄씩 배정)'
                   : '시트 ID: 1jYXplQ... 동기화 준비'}
               </span>
             </div>
@@ -390,7 +359,7 @@ export default function App() {
 
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
                   한마음초 프리마켓 &<br />
-                  <span className="text-[#0E9F98]">체험 프로그램 신청</span>
+                  <span className="text-[#0E9F98]">셀러 신청 & 행운 뽑기권</span>
                 </h1>
                 
                 {/* 한 줄 문구: 표선바다의 시원한 바람과 함께 펼쳐지는 한마음 가족 화합의 날! */}
@@ -422,8 +391,8 @@ export default function App() {
                   <Calendar className="w-4 h-4 text-[#0E9F98] shrink-0" />
                   <div>
                     <span className="text-slate-500 font-normal mr-1">일시:</span>
-                    <strong className="font-bold">10월 24일 10시~3시 (10:00 ~ 15:00)</strong>
-                    <span className="text-[11px] text-teal-700 ml-1.5">(시작 20분 전 세팅)</span>
+                    <strong className="font-bold">10월 24일 11시~2시 (11:00 ~ 14:00)</strong>
+                    <span className="text-[11px] text-teal-700 ml-1.5 font-semibold">(셀러 10:30까지 세팅 완료)</span>
                   </div>
                 </div>
 
@@ -446,28 +415,17 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 체험 프로그램 3종 안내 요약 */}
-              <div className="mt-4 pt-4 border-t border-slate-200/80">
-                <h4 className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-[#0E9F98]" />
-                  <span>타임별 체험 프로그램 (각 8명 정원)</span>
-                </h4>
-                <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
-                  <div className="p-2 rounded-lg bg-white border border-slate-200 shadow-2xs">
-                    <div className="text-base mb-0.5">🎨</div>
-                    <div className="font-bold text-[11px] text-slate-800">1. 만들기</div>
-                    <div className="text-[9px] text-slate-500 mt-0.5">석고방향제&키링</div>
+              {/* 행운 뽑기권 및 현장 미션 안내 */}
+              <div className="mt-4 pt-4 border-t border-slate-200/80 space-y-2.5">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 text-xs text-amber-950 space-y-1.5">
+                  <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                    <Sparkles className="w-4 h-4 text-[#FF8C32]" />
+                    <span>행운 뽑기권 자동 발급 & 보너스 미션</span>
                   </div>
-                  <div className="p-2 rounded-lg bg-white border border-slate-200 shadow-2xs">
-                    <div className="text-base mb-0.5">🎯</div>
-                    <div className="font-bold text-[11px] text-slate-800">2. 게임</div>
-                    <div className="text-[9px] text-slate-500 mt-0.5">미니컬링&신발양궁</div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-white border border-slate-200 shadow-2xs">
-                    <div className="text-base mb-0.5">🎡</div>
-                    <div className="font-bold text-[11px] text-slate-800">3. 룰렛</div>
-                    <div className="text-[9px] text-slate-500 mt-0.5">행운의 선물 룰렛</div>
-                  </div>
+                  <p className="text-[11px] text-slate-700 leading-relaxed">
+                    • <strong>자녀별 1인 1매 자동 부여</strong>: 자리를 신청한 모든 자녀에게 행운 뽑기권 번호가 각각 부여됩니다.<br />
+                    • <strong>현장 추가 증정 미션</strong>: 행사 당일 <strong className="underline">셀러 물건 1개</strong> + <strong className="underline">음식 1개</strong> + <strong className="underline">체험 1개</strong>를 이용하시면 행운 뽑기권 1매를 추가로 드립니다!
+                  </p>
                 </div>
               </div>
             </div>
@@ -489,8 +447,8 @@ export default function App() {
                     운영진
                   </span>
                 </div>
-                <div className="text-xs font-bold text-slate-900">신청 명단 & 잔여석</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">현재 {records.length}가족 접수</div>
+                <div className="text-xs font-bold text-slate-900">자리 & 행운권 명단</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">현재 {records.length}명(행) 등록</div>
               </button>
 
               <button
@@ -516,19 +474,19 @@ export default function App() {
               <div className="mb-6 pb-4 border-b border-slate-200 flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <span>행사 참가 신청서</span>
+                    <span>프리마켓 자리 & 행운 뽑기권 신청서</span>
                     <span className="text-xs font-bold px-2 py-0.5 rounded bg-teal-100 text-[#0E9F98]">
                       온라인 접수
                     </span>
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    가족당 1회 신청 (자녀가 2명인 경우 '+ 두 번째 자녀 추가' 클릭)
+                    가족당 1자리 배정 · 등록된 모든 자녀에게 1인 1매 행운 뽑기권 번호 자동 부여
                   </p>
                 </div>
 
                 <div className="text-right hidden sm:block">
                   <span className="text-[11px] text-slate-400">행사일</span>
-                  <div className="text-xs font-bold text-slate-700">2026. 10. 24 (토)</div>
+                  <div className="text-xs font-bold text-slate-700">10월 24일 11시~2시</div>
                 </div>
               </div>
 
