@@ -623,7 +623,7 @@ export default function App() {
               <button
                 onClick={() => setIsAdminLoginModalOpen(true)}
                 className="hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1.5 text-slate-400 hover:text-slate-600 text-xs"
-                title="운영진 비밀번호(1024) 입력 후 관리 메뉴 활성화"
+                title="운영진 관리자 전용"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span>운영진 전용</span>

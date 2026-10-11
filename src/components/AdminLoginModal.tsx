@@ -21,8 +21,8 @@ export const AdminLoginModal: React.FC<Props> = ({
     e.preventDefault();
     setErrorMsg('');
 
-    // 행사 일시(10월 24일)에 맞춘 직관적인 기본 비밀번호 '1024' (또는 '0000', 'admin')
-    const validPasswords = ['1024', '0000', 'admin'];
+    // 운영진 비밀번호 검증 (사용자가 설정한 1024)
+    const validPasswords = ['1024'];
 
     if (validPasswords.includes(password.trim())) {
       localStorage.setItem('hanmaeum_admin_auth', 'true');
@@ -30,7 +30,7 @@ export const AdminLoginModal: React.FC<Props> = ({
       setPassword('');
       onClose();
     } else {
-      setErrorMsg('비밀번호가 올바르지 않습니다. (기본 비밀번호: 1024)');
+      setErrorMsg('비밀번호가 올바르지 않습니다.');
     }
   };
 
@@ -65,7 +65,7 @@ export const AdminLoginModal: React.FC<Props> = ({
             <input
               type="password"
               autoFocus
-              placeholder="비밀번호 입력 (기본: 1024)"
+              placeholder="비밀번호를 입력하세요"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full text-sm px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 focus:border-[#0E9F98] focus:ring-2 focus:ring-[#0E9F98]/20 focus:outline-none transition-all placeholder:text-slate-400"
@@ -79,13 +79,9 @@ export const AdminLoginModal: React.FC<Props> = ({
             </div>
           )}
 
-          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 leading-snug">
-            💡 <strong>운영진 안내:</strong> 행사일(10월 24일)을 뜻하는 <strong className="underline">1024</strong>를 입력하시면 즉시 로그인되며, 로그인 후에는 이 브라우저에 관리자 상태가 안전하게 유지됩니다.
-          </div>
-
           <button
             type="submit"
-            className="w-full py-2.5 px-4 rounded-xl bg-[#0E9F98] hover:bg-[#0c857f] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full py-2.5 px-4 rounded-xl bg-[#0E9F98] hover:bg-[#0c857f] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
           >
             <ShieldCheck className="w-4 h-4" />
             <span>운영진 모드로 접속</span>
