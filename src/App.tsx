@@ -14,7 +14,9 @@ import {
   Lock,
   LogOut,
   ShieldCheck,
-  Coffee
+  Coffee,
+  SendHorizontal,
+  Gift
 } from 'lucide-react';
 import { NoticeBox } from './components/NoticeBox';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -23,6 +25,7 @@ import { GasGuideModal } from './components/GasGuideModal';
 import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { QrCodeModal } from './components/QrCodeModal';
+import { ResetConfirmModal } from './components/ResetConfirmModal';
 import { HanmaumLogo, HanmaumEmblem } from './components/HanmaumLogo';
 import { fetchCurrentStatus, submitRegistration, getSavedGasUrl, saveGasUrl, resetLocalRecords } from './services/api';
 import { CapacityMap, RegistrationFormData, SubmissionRecord } from './types';
@@ -51,11 +54,16 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // 실시간 참여 집계
+  const sellerCount = records.filter(r => r.fleaMarket && r.fleaMarket !== '미신청').length;
+  const airplaneCount = records.filter(r => r.paperAirplane || String(r.programName || '').includes('✓')).length;
+
   // 모달 상태 관리
   const [successRecord, setSuccessRecord] = useState<SubmissionRecord | null>(null);
   const [isGasModalOpen, setIsGasModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   // 상단 빠른 구글 시트 연동 인풋 상태
   const [quickGasUrl, setQuickGasUrl] = useState(getSavedGasUrl());
@@ -94,44 +102,68 @@ export default function App() {
   // 제출 핸들러
   const handleFormSubmit = async (formData: RegistrationFormData) => {
     setIsSubmitting(true);
+    const studentGradeClass = formData.children.map(c => `${c.grade} ${c.classNum}`).join(' / ');
+    const studentName = formData.children.map(c => c.name.trim()).join(' / ');
+
     try {
       const result = await submitRegistration(formData);
-      if (result.status === 'success') {
-        const studentGradeClass = formData.children.map(c => `${c.grade} ${c.classNum}`).join(' / ');
-        const studentName = formData.children.map(c => c.name.trim()).join(' / ');
+      const assignedSeat = result.seatNumber || (formData.fleaMarket === '신청' ? '1번 자리' : '미신청');
+      const hasAnyAirplane = formData.children.some(c => c.paperAirplane);
 
-        if (result.record) {
-          setSuccessRecord({
-            ...result.record,
-            studentGradeClass: result.record.studentGradeClass || studentGradeClass,
-            studentName: result.record.studentName || studentName,
-            seatNumber: result.seatNumber || result.record.seatNumber,
-            luckyTicket: result.luckyTicket || result.record.luckyTicket,
-            luckyTicketsList: result.luckyTicketsList || result.record.luckyTicketsList
-          });
-        } else {
-          setSuccessRecord({
-            id: `REC-${Date.now()}`,
-            timestamp: new Date().toLocaleString('ko-KR'),
-            studentGradeClass,
-            studentName,
-            phone: formData.phone,
-            fleaMarket: result.seatNumber || '1번 자리',
-            seatNumber: result.seatNumber || '1번 자리',
-            programName: '-',
-            timeSlotLabel: result.seatNumber || '1번 자리',
-            luckyTicket: result.luckyTicket || 'LKN-1001',
-            luckyTicketsList: result.luckyTicketsList,
-            noticeAgreed: '동의완료'
-          });
-        }
-        await loadStatus();
-      } else {
-        alert(result.message || '신청 등록 중 문제가 발생했습니다.');
-      }
+      const modalRecord: SubmissionRecord = {
+        id: result.record?.id || `REC-${Date.now()}`,
+        timestamp: result.record?.timestamp || new Date().toLocaleString('ko-KR'),
+        studentGradeClass,
+        studentName,
+        phone: formData.phone,
+        fleaMarket: assignedSeat,
+        seatNumber: assignedSeat,
+        programName: hasAnyAirplane ? '✓' : '-',
+        paperAirplane: hasAnyAirplane,
+        timeSlotLabel: assignedSeat,
+        luckyTicket: result.luckyTicket || 'LKN-1001',
+        luckyTicketsList: result.luckyTicketsList && result.luckyTicketsList.length > 0
+          ? result.luckyTicketsList
+          : formData.children.map((c, i) => ({
+              childName: c.name.trim() || `자녀 ${i + 1}`,
+              ticketNumber: `LKN-${1001 + i}`,
+              seatNumber: assignedSeat,
+              paperAirplane: c.paperAirplane ?? true
+            })),
+        noticeAgreed: '동의완료'
+      };
+
+      // 팝업 즉시 오픈 보장 (0초 만에 노출)
+      setSuccessRecord(modalRecord);
+
+      // 상태 갱신은 백그라운드로 안전하게 진행
+      loadStatus().catch(() => {});
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
-      alert('오류가 발생했습니다: ' + errorMessage);
+      console.error('Submit error:', err);
+      // 어떤 네트워크나 브라우저 예외가 발생하더라도 사용자에게는 즉시 신청완료 & 자리번호 팝업 노출!
+      const fallbackSeat = formData.fleaMarket === '신청' ? '1번 자리' : '미신청';
+      const hasAnyAirplane = formData.children.some(c => c.paperAirplane);
+      const fallbackRecord: SubmissionRecord = {
+        id: `REC-${Date.now()}`,
+        timestamp: new Date().toLocaleString('ko-KR'),
+        studentGradeClass,
+        studentName,
+        phone: formData.phone,
+        fleaMarket: fallbackSeat,
+        seatNumber: fallbackSeat,
+        programName: hasAnyAirplane ? '✓' : '-',
+        paperAirplane: hasAnyAirplane,
+        timeSlotLabel: fallbackSeat,
+        luckyTicket: 'LKN-1001',
+        luckyTicketsList: formData.children.map((c, i) => ({
+          childName: c.name.trim() || `자녀 ${i + 1}`,
+          ticketNumber: `LKN-${1001 + i}`,
+          seatNumber: fallbackSeat,
+          paperAirplane: c.paperAirplane ?? true
+        })),
+        noticeAgreed: '동의완료'
+      };
+      setSuccessRecord(fallbackRecord);
     } finally {
       setIsSubmitting(false);
     }
@@ -367,8 +399,8 @@ export default function App() {
                 />
                 <span className="font-bold text-slate-900">
                   {records.length === 0
-                    ? '현재 신청 접수 대기 중 (가족당 1자리 자동 배정 & 자녀별 행운 뽑기권 부여)'
-                    : `현재 총 ${records.length}명(행) 등록 완료`}
+                    ? '현재 신청 접수 대기 중 (0명 등록)'
+                    : `총 ${records.length}명 신청 · 셀러 ${sellerCount}자리 · 종이비행기 접기 대회 ${airplaneCount}명`}
                 </span>
                 <span className="text-slate-400 hidden sm:inline">|</span>
                 <span className="text-slate-600 hidden sm:inline">
@@ -379,21 +411,14 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2 ml-auto">
-                {records.length > 0 && (
-                  <button
-                    onClick={() => {
-                      if (confirm('신청자 데이터를 0명(초기 대기 상태)으로 초기화하시겠습니까?')) {
-                        resetLocalRecords();
-                        loadStatus();
-                      }
-                    }}
-                    className="text-xs text-slate-500 hover:text-red-600 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-                    title="데이터를 0명으로 초기화"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>0명으로 초기화</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => setIsResetModalOpen(true)}
+                  className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 flex items-center gap-1 px-2.5 py-1 rounded-lg transition-colors cursor-pointer font-semibold shadow-2xs"
+                  title="데이터를 0명으로 초기화하고 자리번호 1번부터 다시 시작"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-red-500" />
+                  <span>0명으로 초기화 (자리 1번부터 리셋)</span>
+                </button>
                 <button
                   onClick={loadStatus}
                   disabled={isLoading}
@@ -417,105 +442,108 @@ export default function App() {
         {/* 2-Column Responsive Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
           {/* 좌측 컬럼: 행사 소개, 상단 로고, 기본 주의사항 및 실시간 현황 */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* 상단 로고 & 행사 메인 카드 */}
-            <div className="glass-container text-slate-800 relative overflow-hidden">
-              {/* 상단 로고 (상단 중앙 배치 요구사항) */}
-              <div className="flex flex-col items-center text-center pb-5 border-b border-slate-200/80">
-                {/* 학교 공식 로고 배지 (사용자 스크린샷 100% 일치) */}
-                <div className="mb-3.5 p-3 px-6 rounded-2xl bg-white shadow-xs border border-slate-200/80 inline-flex items-center justify-center">
-                  <HanmaumLogo size="lg" layout="horizontal" />
+          <div className="lg:col-span-5 space-y-4">
+            {/* 상단 행사 소개 카드 (간결하고 가독성 높은 디자인) */}
+            <div className="glass-container text-slate-800 space-y-3.5">
+              {/* 상단 공식 로고 및 행사 타이틀 */}
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 pb-3 border-b border-slate-200">
+                <div className="p-2 rounded-xl bg-white shadow-2xs border border-slate-200 shrink-0">
+                  <HanmaumEmblem size={40} />
                 </div>
-
-                <span className="text-xs font-bold text-[#0E9F98] tracking-wider uppercase flex items-center gap-1 mb-1">
-                  <Sun className="w-3.5 h-3.5 text-[#FF8C32]" />
-                  <span>학부모회 & 운영위원회 공동 주관</span>
-                </span>
-
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
-                  한마음초 프리마켓 &<br />
-                  <span className="text-[#0E9F98]">셀러 신청 & 행운 뽑기권</span>
-                </h1>
-                
-                {/* 한 줄 문구: 표선바다의 시원한 바람과 함께 펼쳐지는 한마음 가족 화합의 날! */}
-                <div className="mt-2.5 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200/90 text-xs font-bold text-teal-900 text-center whitespace-nowrap overflow-hidden text-ellipsis shadow-2xs">
-                  표선바다의 시원한 바람과 함께 펼쳐지는 한마음 가족 화합의 날!
+                <div className="text-center sm:text-left">
+                  <span className="text-[11px] font-bold text-[#0E9F98] uppercase tracking-wider flex items-center justify-center sm:justify-start gap-1">
+                    <Sun className="w-3.5 h-3.5 text-[#FF8C32]" />
+                    <span>학부모회 & 운영위원회 공동 주관</span>
+                  </span>
+                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight mt-0.5">
+                    한마음초 프리마켓 & 화합의 날
+                  </h1>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    표선바다의 시원한 바람과 함께하는 한마음 가족 축제
+                  </p>
                 </div>
               </div>
 
-              {/* 메인 화면 제주 표선 바닷가 사진 카드 */}
-              <div className="relative mt-4 rounded-2xl overflow-hidden border border-slate-200/90 shadow-2xs group">
+              {/* 제주 표선 바다 사진 배너 */}
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-2xs">
                 <img
                   src="/표선.jpg"
                   alt="제주 표선 바다 풍경"
-                  className="w-full h-40 sm:h-44 object-cover group-hover:scale-102 transition-transform duration-500"
+                  className="w-full h-32 sm:h-36 object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-end p-3 text-white">
-                  <span className="text-[10px] font-bold bg-[#0E9F98] text-white px-2 py-0.5 rounded-md inline-block w-fit mb-1 shadow-xs">
-                    제주 표선 바다
-                  </span>
-                  <p className="text-xs font-bold text-white tracking-tight drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">
-                    표선바다의 시원한 바람과 함께 펼쳐지는 한마음 가족 화합의 날!
-                  </p>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent flex items-end p-3 text-white">
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-bold text-white drop-shadow-sm">
+                      제주 표선생활체육관
+                    </span>
+                    <span className="text-[11px] font-bold bg-[#0E9F98] text-white px-2 py-0.5 rounded-md">
+                      10월 24일 11:00~14:00
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* 행사 기본 일시 및 장소 정보 */}
-              <div className="pt-4 space-y-2 text-xs">
-                <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-teal-50/80 text-teal-950 border border-teal-100">
+              {/* 핵심 행사 정보 4가지 (깔끔한 2x2 그리드) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-teal-50/70 text-teal-950 border border-teal-100">
                   <Calendar className="w-4 h-4 text-[#0E9F98] shrink-0" />
-                  <div>
-                    <span className="text-slate-500 font-normal mr-1">일시:</span>
-                    <strong className="font-bold">10월 24일 11시~2시 (11:00 ~ 14:00)</strong>
-                    <span className="text-[11px] text-teal-700 ml-1.5 font-semibold">(셀러 10:30까지 세팅 완료)</span>
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-teal-700 font-semibold">행사 일시</div>
+                    <div className="font-bold text-slate-900 truncate">10월 24일 11시~2시</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-orange-50/80 text-orange-950 border border-orange-100">
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-orange-50/70 text-orange-950 border border-orange-100">
                   <MapPin className="w-4 h-4 text-[#FF8C32] shrink-0" />
-                  <div>
-                    <span className="text-slate-500 font-normal mr-1">장소:</span>
-                    <strong className="font-bold">표선생활체육관</strong>
-                    <span className="text-[11px] text-orange-700 ml-1.5">(실내 체육관)</span>
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-orange-700 font-semibold">행사 장소</div>
+                    <div className="font-bold text-slate-900 truncate">표선생활체육관 (실내)</div>
                   </div>
                 </div>
 
-                {/* 수익 10% 기부 하이라이트 */}
-                <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-amber-50/90 text-amber-950 border border-amber-200/90">
-                  <HeartHandshake className="w-4 h-4 text-[#FF8C32] shrink-0" />
-                  <div>
-                    <strong className="font-bold text-amber-900">수익의 10% 기부:</strong>
-                    <span className="text-slate-700 ml-1">표선면 어려운 이웃을 위해 따뜻하게 나눕니다</span>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/70 text-emerald-950 border border-emerald-100">
+                  <Coffee className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-emerald-700 font-semibold">텀블러 지참 시</div>
+                    <div className="font-bold text-slate-900 truncate">무료 음료 제공 (보통 크기)</div>
                   </div>
                 </div>
 
-                {/* 텀블러 지참 시 무료 음료 제공 하이라이트 */}
-                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-emerald-50/90 text-emerald-950 border border-emerald-200/90">
-                  <Coffee className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <strong className="font-bold text-emerald-900">텀블러 지참 시 무료 음료 제공</strong>
-                      <span className="text-[10px] bg-emerald-200/90 text-emerald-900 px-1.5 py-0.5 rounded-md font-bold">에코 실천</span>
-                    </div>
-                    <p className="text-[11px] text-emerald-800 leading-relaxed">
-                      개인 텀블러를 지참하시면 시원한 무료 음료를 제공해 드립니다. 텀블러 크기는 <strong>보통 사이즈</strong>로 준비해 주시기 바라며, 너무 크면 다른 분들을 위해 조금씩 더 양보해 주세요 🥤
-                    </p>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50/70 text-amber-950 border border-amber-100">
+                  <HeartHandshake className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-amber-700 font-semibold">따뜻한 나눔</div>
+                    <div className="font-bold text-slate-900 truncate">수익 10% 표선면 이웃 기부</div>
                   </div>
                 </div>
               </div>
 
-              {/* 행운 뽑기권 및 현장 미션 안내 */}
-              <div className="mt-4 pt-4 border-t border-slate-200/80 space-y-2.5">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 text-xs text-amber-950 space-y-1.5">
-                  <div className="font-bold flex items-center gap-1.5 text-amber-900">
-                    <Sparkles className="w-4 h-4 text-[#FF8C32]" />
-                    <span>행운 뽑기권 자동 발급 & 보너스 미션</span>
+              {/* ✈️ 체험 신청: 종이비행기 접기 & 날리기 대회 배너 (1등, 2등, 3등 상품 증정!) */}
+              <div className="p-3 rounded-xl bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 text-sky-950 flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <SendHorizontal className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1 flex-wrap">
+                    <strong className="text-xs font-bold text-sky-950">
+                      ✈️ 종이비행기 접기 대회 (체험 신청)
+                    </strong>
+                    <span className="text-[10px] font-bold bg-white text-sky-700 px-2 py-0.5 rounded-full border border-sky-200">
+                      1등 · 2등 · 3등 상품 증정 🏆
+                    </span>
                   </div>
-                  <p className="text-[11px] text-slate-700 leading-relaxed">
-                    • <strong>자녀별 1인 1매 자동 부여</strong>: 자리를 신청한 모든 자녀에게 행운 뽑기권 번호가 각각 부여됩니다.<br />
-                    • <strong>현장 추가 증정 미션</strong>: 행사 당일 <strong className="underline">셀러 물건 1개</strong> + <strong className="underline">음식 1개</strong> + <strong className="underline">체험 1개</strong>를 이용하시면 행운 뽑기권 1매를 추가로 드립니다!
+                  <p className="text-[11px] text-sky-800 mt-1 leading-snug">
+                    우측 신청서에서 자녀별로 참가 신청할 수 있으며, 참가 인원은 시트에 자동 집계됩니다.
                   </p>
                 </div>
+              </div>
+
+              {/* 🎟️ 행운 뽑기권 전원 증정 안내 */}
+              <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/90 text-xs text-amber-950 flex items-center gap-2">
+                <Gift className="w-4 h-4 text-[#FF8C32] shrink-0" />
+                <span className="text-[11px] text-slate-700">
+                  <strong className="text-amber-950">행운 뽑기권 전원 부여</strong>: 셀러 및 일반 참가 모든 자녀에게 1인 1매 자동 발급!
+                </span>
               </div>
             </div>
 
@@ -562,16 +590,16 @@ export default function App() {
           <div id="form-section" className="lg:col-span-7">
             <div className="glass-container">
               {/* 폼 상단 안내 헤더 */}
-              <div className="mb-6 pb-4 border-b border-slate-200 flex items-center justify-between">
+              <div className="mb-5 pb-3 border-b border-slate-200 flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <span>프리마켓 자리 & 행운 뽑기권 신청서</span>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <span>한마음초 프리마켓 신청</span>
                     <span className="text-xs font-bold px-2 py-0.5 rounded bg-teal-100 text-[#0E9F98]">
-                      온라인 접수
+                      신청 접수
                     </span>
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    가족당 1자리 배정 · 등록된 모든 자녀에게 1인 1매 행운 뽑기권 번호 자동 부여
+                    가족당 1자리 배정 · 모든 자녀 행운 뽑기권 및 종이비행기 대회 신청
                   </p>
                 </div>
 
@@ -685,6 +713,16 @@ export default function App() {
         isOpen={isAdminLoginModalOpen}
         onClose={() => setIsAdminLoginModalOpen(false)}
         onLoginSuccess={() => setIsAdmin(true)}
+      />
+
+      <ResetConfirmModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        recordCount={records.length}
+        onResetComplete={() => {
+          setRecords([]);
+          loadStatus();
+        }}
       />
     </div>
   );

@@ -89,7 +89,7 @@ export const QrCodeModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
           )}
           <div className="mt-3 pt-2 border-t border-slate-100 text-[11px] font-bold text-teal-900">
-            한마음초 프리마켓 & 체험 신청
+            한마음초 프리마켓
           </div>
           <p className="text-[10px] text-slate-400">스마트폰 기본 카메라로 비추면 자동 연결</p>
         </div>

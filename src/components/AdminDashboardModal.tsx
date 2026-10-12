@@ -7,10 +7,12 @@ import {
   RotateCcw,
   Search,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  SendHorizontal
 } from 'lucide-react';
 import { CapacityMap, SubmissionRecord } from '../types';
 import { resetLocalRecords } from '../services/api';
+import { ResetConfirmModal } from './ResetConfirmModal';
 
 interface Props {
   isOpen: boolean;
@@ -27,6 +29,7 @@ export const AdminDashboardModal: React.FC<Props> = ({
   onDataReset
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -37,6 +40,9 @@ export const AdminDashboardModal: React.FC<Props> = ({
   ).length;
   const luckyDrawCount = records.filter(
     (r) => r.luckyTicket && r.luckyTicket !== '미신청'
+  ).length;
+  const airplaneCount = records.filter(
+    (r) => r.paperAirplane || String(r.programName || '').includes('✓')
   ).length;
 
   // 필터링된 기록
@@ -59,6 +65,7 @@ export const AdminDashboardModal: React.FC<Props> = ({
       '학년/반',
       '연락처',
       '프리마켓 배정 자리',
+      '종이비행기 접기 대회',
       '행운 뽑기권 번호',
       '주의사항 동의'
     ];
@@ -70,6 +77,7 @@ export const AdminDashboardModal: React.FC<Props> = ({
       `"${r.studentGradeClass}"`,
       `"${r.phone}"`,
       `"${r.fleaMarket || r.seatNumber || '미신청'}"`,
+      `"${(r.paperAirplane || String(r.programName || '').includes('✓')) ? '신청(✓)' : '미신청'}"`,
       `"${r.luckyTicket}"`,
       `"${r.noticeAgreed}"`
     ]);
@@ -90,10 +98,7 @@ export const AdminDashboardModal: React.FC<Props> = ({
   };
 
   const handleReset = () => {
-    if (confirm('신청자 데이터를 0명(초기 대기 상태)으로 초기화하시겠습니까?')) {
-      resetLocalRecords();
-      onDataReset();
-    }
+    setIsResetConfirmOpen(true);
   };
 
   return (
@@ -137,7 +142,7 @@ export const AdminDashboardModal: React.FC<Props> = ({
         </div>
 
         {/* 상단 요약 지표 */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
             <div className="text-slate-500 text-xs flex items-center gap-1 mb-1">
               <Users className="w-3.5 h-3.5 text-teal-600" />
@@ -170,6 +175,17 @@ export const AdminDashboardModal: React.FC<Props> = ({
               <span className="text-xs font-normal text-slate-500 ml-1">매</span>
             </div>
           </div>
+
+          <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+            <div className="text-slate-500 text-xs flex items-center gap-1 mb-1">
+              <SendHorizontal className="w-3.5 h-3.5 text-sky-600" />
+              <span>종이비행기 접기 대회</span>
+            </div>
+            <div className="text-2xl font-black text-sky-600 font-mono">
+              {airplaneCount}
+              <span className="text-xs font-normal text-slate-500 ml-1">명</span>
+            </div>
+          </div>
         </div>
 
         {/* 검색 바 */}
@@ -197,6 +213,7 @@ export const AdminDashboardModal: React.FC<Props> = ({
                   <th className="p-2.5 whitespace-nowrap">학년/반</th>
                   <th className="p-2.5 whitespace-nowrap">연락처</th>
                   <th className="p-2.5 text-center whitespace-nowrap">프리마켓 자리</th>
+                  <th className="p-2.5 text-center whitespace-nowrap">종이비행기 접기</th>
                   <th className="p-2.5 text-center whitespace-nowrap">행운 뽑기권 번호</th>
                   <th className="p-2.5 whitespace-nowrap">접수시각</th>
                 </tr>
@@ -204,50 +221,62 @@ export const AdminDashboardModal: React.FC<Props> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-400 text-xs">
+                    <td colSpan={8} className="p-8 text-center text-slate-400 text-xs">
                       신청 내역이 없습니다.
                     </td>
                   </tr>
                 ) : (
-                  filteredRecords.map((r, index) => (
-                    <tr key={r.id || index} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-2.5 text-center text-slate-400 font-mono text-[11px]">
-                        {index + 1}
-                      </td>
-                      <td className="p-2.5 font-bold text-slate-900 whitespace-nowrap">
-                        {r.studentName}
-                      </td>
-                      <td className="p-2.5 text-slate-600 whitespace-nowrap">
-                        {r.studentGradeClass}
-                      </td>
-                      <td className="p-2.5 text-slate-600 font-mono text-[11px] whitespace-nowrap">
-                        {r.phone}
-                      </td>
-                      <td className="p-2.5 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                            r.fleaMarket && r.fleaMarket !== '미신청'
-                              ? 'bg-teal-100 text-teal-900 border border-teal-200'
-                              : 'bg-slate-100 text-slate-500'
-                          }`}
-                        >
-                          {r.fleaMarket || r.seatNumber || '미신청'}
-                        </span>
-                      </td>
-                      <td className="p-2.5 text-center whitespace-nowrap">
-                        {r.luckyTicket && r.luckyTicket !== '미신청' ? (
-                          <span className="font-mono font-bold text-[#FF8C32] bg-orange-50 px-2 py-0.5 rounded text-[11px] border border-orange-200">
-                            {r.luckyTicket}
+                  filteredRecords.map((r, index) => {
+                    const isAirplane = r.paperAirplane || String(r.programName || '').includes('✓');
+                    return (
+                      <tr key={r.id || index} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-2.5 text-center text-slate-400 font-mono text-[11px]">
+                          {index + 1}
+                        </td>
+                        <td className="p-2.5 font-bold text-slate-900 whitespace-nowrap">
+                          {r.studentName}
+                        </td>
+                        <td className="p-2.5 text-slate-600 whitespace-nowrap">
+                          {r.studentGradeClass}
+                        </td>
+                        <td className="p-2.5 text-slate-600 font-mono text-[11px] whitespace-nowrap">
+                          {r.phone}
+                        </td>
+                        <td className="p-2.5 text-center whitespace-nowrap">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              r.fleaMarket && r.fleaMarket !== '미신청'
+                                ? 'bg-teal-100 text-teal-900 border border-teal-200'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}
+                          >
+                            {r.fleaMarket || r.seatNumber || '미신청'}
                           </span>
-                        ) : (
-                          <span className="text-slate-400 text-[11px]">미발급</span>
-                        )}
-                      </td>
-                      <td className="p-2.5 text-slate-400 text-[10px] whitespace-nowrap">
-                        {r.timestamp}
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="p-2.5 text-center whitespace-nowrap">
+                          {isAirplane ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                              ✓ 참가 (1·2·3등)
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">-</span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-center whitespace-nowrap">
+                          {r.luckyTicket && r.luckyTicket !== '미신청' ? (
+                            <span className="font-mono font-bold text-[#FF8C32] bg-orange-50 px-2 py-0.5 rounded text-[11px] border border-orange-200">
+                              {r.luckyTicket}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">미발급</span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-slate-400 text-[10px] whitespace-nowrap">
+                          {r.timestamp}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -263,6 +292,15 @@ export const AdminDashboardModal: React.FC<Props> = ({
             닫기
           </button>
         </div>
+
+        <ResetConfirmModal
+          isOpen={isResetConfirmOpen}
+          onClose={() => setIsResetConfirmOpen(false)}
+          recordCount={records.length}
+          onResetComplete={() => {
+            onDataReset();
+          }}
+        />
       </div>
     </div>
   );

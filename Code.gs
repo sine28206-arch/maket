@@ -58,7 +58,23 @@ function initHeaders(sheet) {
  */
 function doGet(e) {
   try {
+    const action = (e && e.parameter) ? e.parameter.action : "";
     const sheet = getTargetSheet();
+    
+    // 0명 데이터 초기화 요청 처리
+    if (action === "reset") {
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.deleteRows(2, lastRow - 1);
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "구글 시트의 모든 신청 내역이 0명으로 초기화되었습니다.",
+        records: [],
+        totalCount: 0
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     const data = sheet.getDataRange().getValues();
     
     const records = [];
@@ -67,14 +83,18 @@ function doGet(e) {
       const row = data[i];
       if (!row[0] && !row[1]) continue;
       
+      const cellE = String(row[4] || "");
+      const isAirplane = cellE.indexOf("✓") !== -1 || cellE.indexOf("신청") !== -1 || cellE.indexOf("O") !== -1;
+
       records.push({
         id: "REC-" + i,
         studentGradeClass: row[0] || "",
         studentName: row[1] || "",
         phone: row[2] || "",
         fleaMarket: row[3] || "미신청",
-        seatNumber: row[3] || row[5] || "",
-        programName: row[4] || "-",
+        seatNumber: row[3] || row[5] || "미신청",
+        programName: isAirplane ? "✓" : "-",
+        paperAirplane: isAirplane,
         timeSlotLabel: row[5] || "",
         luckyTicket: row[6] || "미신청",
         noticeAgreed: "동의완료"
@@ -168,7 +188,8 @@ function doPost(e) {
       childList = postData.children.map(function(c) {
         return {
           gradeClass: (c.grade || "") + " " + (c.classNum || ""),
-          name: (c.name || "").trim()
+          name: (c.name || "").trim(),
+          paperAirplane: Boolean(c.paperAirplane !== false)
         };
       });
     } else if (Array.isArray(postData.childrenList) && postData.childrenList.length > 0) {
@@ -176,7 +197,8 @@ function doPost(e) {
       childList = postData.childrenList.map(function(name, idx) {
         return {
           gradeClass: (gradeParts[idx] || gradeParts[0] || "").trim(),
-          name: String(name).trim()
+          name: String(name).trim(),
+          paperAirplane: Boolean(postData.paperAirplane !== false)
         };
       });
     } else {
@@ -185,7 +207,8 @@ function doPost(e) {
       childList = nameParts.map(function(name, idx) {
         return {
           gradeClass: (gradeParts[idx] || gradeParts[0] || "").trim(),
-          name: String(name).trim()
+          name: String(name).trim(),
+          paperAirplane: Boolean(postData.paperAirplane !== false)
         };
       });
     }
@@ -198,27 +221,30 @@ function doPost(e) {
       curLucky++;
       const childObj = childList[cIdx];
       const ticketNum = "LKN-" + curLucky;
+      const isAirplane = childObj.paperAirplane !== false;
+      const airplaneSymbol = isAirplane ? "✓" : "-";
       
       luckyTicketsList.push({
         childName: childObj.name,
         ticketNumber: ticketNum,
-        seatNumber: assignedSeat
+        seatNumber: assignedSeat,
+        paperAirplane: isAirplane
       });
       
       // 시트에 추가될 1행:
       // A열: 학년/반
       // B열: 학생 이름
       // C열: 연락처
-      // D열: 프리마켓 자리신청 (예: 1번 자리)
-      // E열: 체험 프로그램 (-)
-      // F열: 배정 순서 (예: 1번 자리)
+      // D열: 프리마켓 자리신청 (예: 1번 자리 or 미신청)
+      // E열: 체험신청 (종이비행기 접기 대회: ✓ or -)
+      // F열: 배정 순서 / 자리 (예: 1번 자리 or 미신청)
       // G열: 행운권 번호 (예: LKN-1001)
       const childRow = [
         childObj.gradeClass,              // A열
         childObj.name,                    // B열
         postData.phone || "",             // C열
-        assignedSeat,                     // D열 (프리마켓 자리 자동 부여)
-        "-",                              // E열 (체험프로그램 삭제)
+        assignedSeat,                     // D열 (프리마켓 자리 자동 부여 or 미신청)
+        airplaneSymbol,                   // E열 (종이비행기 접기 대회: ✓ or -)
         assignedSeat,                     // F열 (배정 순서 / 자리)
         ticketNum                         // G열 (해당 아이의 행운 뽑기권 번호)
       ];
