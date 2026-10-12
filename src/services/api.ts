@@ -1,15 +1,18 @@
 import { CapacityMap, GasResponse, LuckyTicketItem, RegistrationFormData, SubmissionRecord } from '../types';
 
 const STORAGE_KEY_GAS_URL = 'hanmaeum_gas_url';
-const STORAGE_KEY_RECORDS = 'hanmaeum_records_prod_v1';
-const STORAGE_KEY_LAST_LUCKY = 'hanmaeum_last_lucky_prod_v1';
-const STORAGE_KEY_LAST_SEAT = 'hanmaeum_last_seat_prod_v1';
+const STORAGE_KEY_RECORDS = 'hanmaeum_records_prod_v2';
+const STORAGE_KEY_LAST_LUCKY = 'hanmaeum_last_lucky_prod_v2';
+const STORAGE_KEY_LAST_SEAT = 'hanmaeum_last_seat_prod_v2';
 
 const INITIAL_RECORDS: SubmissionRecord[] = [];
 
 // 이전 버전의 잔여 로컬스토리지 키 말끔히 정리 (새로운 1번 자리부터 시작 보장)
 function cleanOldStorageKeys(): void {
   const oldKeys = [
+    'hanmaeum_records_prod_v1',
+    'hanmaeum_last_seat_prod_v1',
+    'hanmaeum_last_lucky_prod_v1',
     'hanmaeum_records_flea_v1',
     'hanmaeum_records_flea_v2',
     'hanmaeum_records_flea_v3',
@@ -71,7 +74,28 @@ export function saveLocalRecords(records: SubmissionRecord[]): void {
 }
 
 export async function resetLocalRecords(clearGas: boolean = false): Promise<void> {
-  cleanOldStorageKeys();
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('hanmaeum_')) {
+        if (!clearGas && k === STORAGE_KEY_GAS_URL) {
+          continue;
+        }
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch {
+        // ignore
+      }
+    });
+  } catch {
+    // ignore
+  }
+
   localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify([]));
   localStorage.setItem(STORAGE_KEY_LAST_LUCKY, '1000');
   localStorage.setItem(STORAGE_KEY_LAST_SEAT, '0');
@@ -82,22 +106,14 @@ export async function resetLocalRecords(clearGas: boolean = false): Promise<void
 
   const gasUrl = getSavedGasUrl();
   if (gasUrl) {
-    try {
-      // CORS preflight 없이 실행되도록 단순 GET 요청
-      await fetch(`${gasUrl}?action=reset&t=${Date.now()}`, {
-        method: 'GET'
-      });
-    } catch {
-      // no-cors fallback
-      try {
-        await fetch(`${gasUrl}?action=reset&t=${Date.now()}`, {
-          method: 'GET',
-          mode: 'no-cors'
-        });
-      } catch {
-        // ignore
-      }
-    }
+    const resetUrl = `${gasUrl}?action=reset&t=${Date.now()}`;
+    const getPromise = fetch(resetUrl, { method: 'GET', mode: 'no-cors' }).catch(() => {});
+    const postPromise = fetch(gasUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ action: 'reset' })
+    }).catch(() => {});
+    await Promise.allSettled([getPromise, postPromise]);
   }
 }
 

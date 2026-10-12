@@ -144,6 +144,21 @@ function doPost(e) {
     }
     
     const sheet = getTargetSheet();
+
+    // 0명 데이터 초기화 요청 처리 (POST 방식 지원)
+    if (postData.action === "reset") {
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.deleteRows(2, lastRow - 1);
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "구글 시트의 모든 신청 내역이 0명으로 초기화되었습니다.",
+        records: [],
+        totalCount: 0
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
     const data = sheet.getDataRange().getValues();
     
     // 1. 기존 시트에서 최대 자리 번호(D열, F열) 탐색
