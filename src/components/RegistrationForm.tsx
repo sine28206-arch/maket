@@ -12,7 +12,8 @@ import {
   Info,
   Clock,
   Sparkles,
-  Gift
+  Gift,
+  Coffee
 } from 'lucide-react';
 import { CapacityMap, RegistrationFormData } from '../types';
 
@@ -334,7 +335,21 @@ export const RegistrationForm: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 6. 필수 주의사항 동의 체크 */}
+      {/* 6. 텀블러 지참 시 무료 음료 제공 안내 */}
+      <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-2.5">
+        <Coffee className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+        <div className="leading-snug space-y-0.5">
+          <div className="font-bold text-emerald-900 flex items-center gap-1.5 flex-wrap">
+            <span>텀블러 지참 시 무료 음료 제공!</span>
+            <span className="text-[10px] bg-emerald-200/90 text-emerald-900 px-1.5 py-0.2 rounded-md font-bold">보통 사이즈</span>
+          </div>
+          <p className="text-[11px] text-emerald-800 leading-relaxed">
+            개인 텀블러를 지참해 오시면 맛있는 무료 음료를 드립니다. 텀블러 크기는 <strong>보통 사이즈</strong>로 부탁드리며, 너무 크면 다른 사람들을 위해 더 양보해 주세요 🥤
+          </p>
+        </div>
+      </div>
+
+      {/* 7. 필수 주의사항 동의 체크 */}
       <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80">
         <label className="flex items-start gap-3 cursor-pointer select-none">
           <input

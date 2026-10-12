@@ -11,7 +11,8 @@ import {
   X,
   Phone,
   Clock,
-  Sparkles
+  Sparkles,
+  Coffee
 } from 'lucide-react';
 import { SubmissionRecord } from '../types';
 
@@ -165,6 +166,14 @@ export const SuccessModal: React.FC<Props> = ({ record, onClose, onReset }) => {
               <Sparkles className="w-4 h-4 text-[#FF8C32] shrink-0 mt-0.5" />
               <div className="leading-snug">
                 <strong>현장 보너스 미션:</strong> 당일 <span className="font-bold underline">셀러 물건 1개</span> + <span className="font-bold underline">음식 1개</span> + <span className="font-bold underline">체험 1개</span>를 참여하시면 운영본부에서 <strong className="text-[#FF8C32]">행운 뽑기권 1매를 추가</strong>로 증정합니다!
+              </div>
+            </div>
+
+            {/* 텀블러 지참 시 무료 음료 제공 에코 안내 */}
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-2">
+              <Coffee className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="leading-snug">
+                <strong className="text-emerald-900">텀블러 지참 혜택:</strong> 개인 텀블러(보통 사이즈)를 챙겨오시면 <span className="font-bold underline text-emerald-800">무료 음료를 제공</span>해 드립니다! (너무 큰 텀블러는 다른 분들을 위해 조금씩 더 양보해 주세요 🥤)
               </div>
             </div>
           </div>

@@ -13,7 +13,8 @@ import {
   HeartHandshake,
   Lock,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Coffee
 } from 'lucide-react';
 import { NoticeBox } from './components/NoticeBox';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -485,6 +486,20 @@ export default function App() {
                   <div>
                     <strong className="font-bold text-amber-900">수익의 10% 기부:</strong>
                     <span className="text-slate-700 ml-1">표선면 어려운 이웃을 위해 따뜻하게 나눕니다</span>
+                  </div>
+                </div>
+
+                {/* 텀블러 지참 시 무료 음료 제공 하이라이트 */}
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-emerald-50/90 text-emerald-950 border border-emerald-200/90">
+                  <Coffee className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <strong className="font-bold text-emerald-900">텀블러 지참 시 무료 음료 제공</strong>
+                      <span className="text-[10px] bg-emerald-200/90 text-emerald-900 px-1.5 py-0.5 rounded-md font-bold">에코 실천</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800 leading-relaxed">
+                      개인 텀블러를 지참하시면 시원한 무료 음료를 제공해 드립니다. 텀블러 크기는 <strong>보통 사이즈</strong>로 준비해 주시기 바라며, 너무 크면 다른 분들을 위해 조금씩 더 양보해 주세요 🥤
+                    </p>
                   </div>
                 </div>
               </div>

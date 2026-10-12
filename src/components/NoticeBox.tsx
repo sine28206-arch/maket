@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Clock, Trash2, UtensilsCrossed, Users, Maximize2, HeartHandshake, Gift, Calendar } from 'lucide-react';
+import { AlertTriangle, Clock, Trash2, UtensilsCrossed, Users, Maximize2, HeartHandshake, Gift, Calendar, Coffee } from 'lucide-react';
 
 export const NoticeBox: React.FC = () => {
   const notices = [
@@ -12,44 +12,51 @@ export const NoticeBox: React.FC = () => {
     },
     {
       num: 2,
+      icon: Coffee,
+      title: '텀블러 지참 시 무료 음료 제공 (보통 사이즈)',
+      desc: '환경을 보호하는 에코 실천! 개인 텀블러를 지참해 오시면 시원한 무료 음료를 제공해 드립니다. 텀블러 크기는 보통 사이즈로 준비해 주시기 바라며, 너무 크면 다른 사람들을 위해 더 양보해 주세요.',
+      highlight: true
+    },
+    {
+      num: 3,
       icon: Calendar,
       title: '행사 일시: 10월 24일 11시~2시 (11:00 ~ 14:00)',
       desc: '행사는 10월 24일 오전 11시부터 오후 2시까지 진행됩니다. 시간 내 자유롭게 둘러보고 구매하실 수 있습니다.'
     },
     {
-      num: 3,
+      num: 4,
       icon: Clock,
       title: '셀러는 10시 30분까지 도착 & 세팅 완료',
       desc: '프리마켓 셀러로 신청하신 학부모님과 학생은 행사 시작 전 원활한 진행을 위해 오전 10시 30분까지 체육관에 도착하여 자리 세팅을 마쳐 주세요.',
       highlight: true
     },
     {
-      num: 4,
+      num: 5,
       icon: Gift,
       title: '행운 뽑기권 특별 미션 이벤트',
       desc: '현장에서 [셀러 물건 1개 + 음식 1개 + 체험 1개]를 이용(구매/참여)하시면 행운 뽑기권 1매를 추가로 증정합니다!',
       highlight: true
     },
     {
-      num: 5,
+      num: 6,
       icon: Users,
       title: '가족당 1자리 자동 배정 & 1인 1매 행운 뽑기권',
       desc: '프리마켓 부스 자리는 가족당 최대 1자리만 신청 가능하며, 등록된 모든 자녀에게는 각자 1매씩 행운 뽑기권 번호가 자동 부여됩니다.'
     },
     {
-      num: 6,
+      num: 7,
       icon: UtensilsCrossed,
-      title: '체육관 내부 음식물 섭취 절대 불가',
-      desc: '표선생활체육관 쾌적한 마루 바닥 보호를 위해 체육관 내부 음식물 반입 및 섭취가 엄격히 금지됩니다. (생수 제외)'
+      title: '체육관 내부 음식물 섭취 주의',
+      desc: '표선생활체육관 쾌적한 마루 바닥 보호를 위해 체육관 내부 음식물 반입 및 섭취가 엄격히 금지됩니다. (생수 제외 / 음료 및 간식은 지정된 야외 구역 이용)'
     },
     {
-      num: 7,
+      num: 8,
       icon: Trash2,
       title: '쓰레기 되가져가기',
       desc: '행사장에서 본인이 발생시킨 모든 쓰레기는 클린 제주를 위해 반드시 각자 가정으로 되가져가 주시기 바랍니다.'
     },
     {
-      num: 8,
+      num: 9,
       icon: Maximize2,
       title: '돗자리 크기 준수',
       desc: '통로 안전 확보를 위해 돗자리 규격은 최대 200cm × 240cm를 초과할 수 없습니다.'
